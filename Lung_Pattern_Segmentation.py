@@ -19,10 +19,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import scipy.misc
-from . import CTViewer as cv
+#from . import CTViewer as cv
 
-
-scan_file = "TIANCHI_data/train/LKDS-00001.mhd"
+data_path = "E:\\LUNA16\\data\\"
+scan_file = data_path + "1.3.6.1.4.1.14519.5.2.1.6279.6001.105756658031515062000744821260.mhd"
 
 def load_scan(file):
     full_scan = sitk.ReadImage(scan_file)
@@ -148,14 +148,80 @@ def extend_mask(image):
     dilatedMask = binary_dilation(mask,structure=struct,iterations=10) 
     return dilatedMask
 
+def del_surplus(lung_mask, image):
+    for z in range(lung_mask.shape[0]):
+        slice_z = lung_mask[z,:,:]       #轴向切片
+        sum_z = slice_z.sum()            #计算轴向切片的和
+        if(sum_z != 0):                  #和不等于0，说明包含需保留的组织
+            z_top = z                    #确定该位置
+            lung_mask = lung_mask[z_top:,:,:]          #保留z_top以下的部分
+            image = image[z_top:,:,:]
+            break
+
+    for z in range(0, lung_mask.shape[0])[::-1]:
+        slice_z = lung_mask[z,:,:]
+        sum_z = slice_z.sum()
+        if(sum_z != 0):
+            z_bottom = z
+            lung_mask = lung_mask[:z_bottom+1,:,:]     #保留z_bottom以上的部分
+            image = image[:z_bottom+1,:,:]
+            break
+
+    for y in range(lung_mask.shape[1]):
+        slice_y = lung_mask[:,y,:]
+        sum_y = slice_y.sum()
+        if(sum_y != 0):
+            y_top = y
+            lung_mask = lung_mask[:,y_top:,:]         #保留y_top以下的部分
+            image = image[:,y_top:,:]
+            break
+
+    for y in range(0, lung_mask.shape[1])[::-1]:
+        slice_y = lung_mask[:,y,:]
+        sum_y = slice_y.sum()
+        if(sum_y != 0):
+            y_bottom = y
+            lung_mask = lung_mask[:,:y_bottom+1,:]     #保留y_bottom以上的部分
+            image = image[:,:y_bottom+1,:]
+            break
+
+    for x in range(lung_mask.shape[2]):
+        slice_x = lung_mask[:,:,x]
+        sum_x = slice_x.sum()
+        if(sum_x != 0):
+            x_top = x 
+            lung_mask = lung_mask[:,:,x_top:]           #保留x_top以下的部分
+            image = image[:,:,x_top:]
+            break
+
+    for x in range(0, lung_mask.shape[2])[::-1]:
+        slice_x = lung_mask[:,:,x]
+        sum_x = slice_x.sum()
+        if(sum_x != 0):
+            x_bottom = x
+            lung_mask = lung_mask[:,:,:x_bottom+1]       # 保留x_bottom以上的部分
+            image = image[:,:,:x_bottom+1]
+            break
+
+    return lung_mask, image
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     img_array, origin, old_spacing = load_scan(scan_file)
     image, new_spacing = resample(img_array, old_spacing)
     #segmented_lungs = segment_lung_mask(image, False)
     segmented_lungs_filled = segment_lung_mask(image, True)
-    cv.view_CT(segmented_lungs_filled)
+    #cv.view_CT(segmented_lungs_filled)
 
     process_lungs = extend_mask(segmented_lungs_filled)
-    cv.view_CT(process_lungs)
-
-#plot_3d(process_lungs, 0)
+    process_lungs, image = del_surplus(process_lungs, image)
+    #cv.view_CT(process_lungs)
+    seg_lung = image * process_lungs
+    #plot_3d(process_lungs, 0)
+    np.save("1.3.6.1.4.1.14519.5.2.1.6279.6001.105756658031515062000744821260.npy", seg_lung)
